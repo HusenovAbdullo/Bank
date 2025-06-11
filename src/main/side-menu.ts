@@ -33,83 +33,83 @@ const menu: Array<Menu | "divider"> = [
     pageName: "dashboard-overview-1",
     title: "dashboard",
   },
-  {
-    icon: "ShoppingBag",
-    pageName: "ecommerce",
-    title: "reports",
-    subMenu: [
-      {
-        icon: "Inbox",
-        pageName: "inbox",
-        title: "batch_statistics",
-      },
-      {
-        icon: "Activity",
-        pageName: "add-product",
-        title: "statuses_statistics",
-      },
-      // {
-      //   icon: "Activity",
-      //   pageName: "products",
-      //   title: "Products",
-      //   subMenu: [
-      //     {
-      //       icon: "Zap",
-      //       pageName: "product-list",
-      //       title: "Product List",
-      //     },
-      //     {
-      //       icon: "Zap",
-      //       pageName: "product-grid",
-      //       title: "Product Grid",
-      //     },
-      //   ],
-      // },
-      // {
-      //   icon: "Activity",
-      //   pageName: "transactions",
-      //   title: "Transactions",
-      //   subMenu: [
-      //     {
-      //       icon: "Zap",
-      //       pageName: "transaction-list",
-      //       title: "Transaction List",
-      //     },
-      //     {
-      //       icon: "Zap",
-      //       pageName: "transaction-detail",
-      //       title: "Transaction Detail",
-      //     },
-      //   ],
-      // },
-      // {
-      //   icon: "Activity",
-      //   pageName: "sellers",
-      //   title: "Sellers",
-      //   subMenu: [
-      //     {
-      //       icon: "Zap",
-      //       pageName: "seller-list",
-      //       title: "Seller List",
-      //     },
-      //     {
-      //       icon: "Zap",
-      //       pageName: "seller-detail",
-      //       title: "Seller Detail",
-      //     },
-      //   ],
-      // },
-      {
-        icon: "Activity",
-        pageName: "reviews",
-        title: "statistics",
-      },
-    ],
-  },
+  // {
+  //   icon: "ShoppingBag",
+  //   pageName: "ecommerce",
+  //   title: "reports",
+  //   subMenu: [
+  //     {
+  //       icon: "Inbox",
+  //       pageName: "inbox",
+  //       title: "batch_statistics",
+  //     },
+  //     {
+  //       icon: "Activity",
+  //       pageName: "add-product",
+  //       title: "statuses_statistics",
+  //     },
+  //     {
+  //       icon: "Activity",
+  //       pageName: "products",
+  //       title: "Products",
+  //       subMenu: [
+  //         {
+  //           icon: "Zap",
+  //           pageName: "product-list",
+  //           title: "Product List",
+  //         },
+  //         {
+  //           icon: "Zap",
+  //           pageName: "product-grid",
+  //           title: "Product Grid",
+  //         },
+  //       ],
+  //     },
+  //     {
+  //       icon: "Activity",
+  //       pageName: "transactions",
+  //       title: "Transactions",
+  //       subMenu: [
+  //         {
+  //           icon: "Zap",
+  //           pageName: "transaction-list",
+  //           title: "Transaction List",
+  //         },
+  //         {
+  //           icon: "Zap",
+  //           pageName: "transaction-detail",
+  //           title: "Transaction Detail",
+  //         },
+  //       ],
+  //     },
+  //     {
+  //       icon: "Activity",
+  //       pageName: "sellers",
+  //       title: "Sellers",
+  //       subMenu: [
+  //         {
+  //           icon: "Zap",
+  //           pageName: "seller-list",
+  //           title: "Seller List",
+  //         },
+  //         {
+  //           icon: "Zap",
+  //           pageName: "seller-detail",
+  //           title: "Seller Detail",
+  //         },
+  //       ],
+  //     },
+  //     {
+  //       icon: "Activity",
+  //       pageName: "reviews",
+  //       title: "statistics",
+  //     },
+  //   ],
+  // },
   {
     icon: "Activity",
     pageName: "categories",
-    title: "proof_of_delivery",
+    title: "statuses_statistics",
   },
   {
     icon: "MapIcon",

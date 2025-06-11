@@ -28,15 +28,16 @@ const showLoginError = () => {
 // Kirish funksiyasi
 const login = async () => {
   try {
-    const response = await axios.post("https://ftp.treking.uz/api/v1/token/", {
+    const response = await axios.post("https://bank1.pochta.uz/api/v1/token/", {
       phone_number: phoneNumber.value,
       password: password.value,
     });
 
     const token = response.data.access;
-
+    const phone = response.data.phone_number
     // Tokenni saqlaymiz
     localStorage.setItem("token", token); // <-- bu nom `token` bo'lishi kerak (router guard bilan mos bo'lishi uchun)
+    localStorage.setItem("phone", phone); // <-- bu nom `token` bo'lishi kerak (router guard bilan mos bo'lishi uchun)
 
     // Bosh sahifaga yo‘naltiramiz
     router.push("/");

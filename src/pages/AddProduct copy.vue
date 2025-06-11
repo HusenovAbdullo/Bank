@@ -28,7 +28,7 @@ const initTabulator = async () => {
 
   if (tableRef.value) {
     tabulator.value = new Tabulator(tableRef.value, {
-      ajaxURL: "https://ftp.treking.uz/api/v1/mails-all/",
+      ajaxURL: "https://bank1.pochta.uz/api/v1/mails-all/",
       ajaxConfig: {
         method: "GET",
         headers: {
@@ -79,7 +79,7 @@ const initTabulator = async () => {
 
             // Misol uchun APIga yuborish:
             try {
-              const res = await axios.post("https://ftp.treking.uz/api/v1/mails-confirm/", {
+              const res = await axios.post("https://bank1.pochta.uz/api/v1/mails-confirm/", {
                 id: rowData.id
               }, {
                 headers: { Authorization: `Bearer ${token}` }

@@ -66,7 +66,7 @@ const takePhoto = async () => {
   }
 
   try {
-    const response = await axios.post("https://ftp.treking.uz/api/v1/face-recognition/", {
+    const response = await axios.post("https://bank1.pochta.uz/api/v1/face-recognition/", {
       photo: base64Image, // base64 formatda yuboriladi
     }, {
       headers: {
@@ -76,7 +76,7 @@ const takePhoto = async () => {
     });
 
     if (response.data?.success) {
-      await axios.post("https://ftp.treking.uz/api/v1/mails-confirm/", {
+      await axios.post("https://bank1.pochta.uz/api/v1/mails-confirm/", {
         id: currentRowData.id,
       }, {
         headers: { Authorization: `Bearer ${token}` }
@@ -104,7 +104,7 @@ const initTabulator = async () => {
 
   if (tableRef.value) {
     tabulator.value = new Tabulator(tableRef.value, {
-      ajaxURL: "https://ftp.treking.uz/api/v1/mails-all/",
+      ajaxURL: "https://bank1.pochta.uz/api/v1/mails-all/",
       ajaxConfig: {
         method: "GET",
         headers: { Authorization: `Bearer ${token}` },

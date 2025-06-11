@@ -21,7 +21,7 @@ const counts = ref<number[]>([]);
 onMounted(async () => {
   const token = localStorage.getItem("token");
   try {
-    const response = await axios.get("https://ftp.treking.uz/api/v1/dashboard-months/", {
+    const response = await axios.get("https://bank1.pochta.uz/api/v1/dashboard-months/", {
       headers: {
         Authorization: `Bearer ${token}`,
       },

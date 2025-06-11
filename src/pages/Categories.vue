@@ -1,252 +1,358 @@
-<template>
-  <div class="p-5 relative">
-    <!-- Loader -->
-    <Loading :active="loading" loader="ball-triangle" color="#1e40af" :is-full-page="true" />
-
-    <!-- Custom loading text -->
-    <div v-if="loading"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 text-white text-xl font-semibold">
-      <div class="text-center">
-        Yuklanmoqda<span class="dots"><span>.</span><span>.</span><span>.</span></span>
-      </div>
-    </div>
-
-    <!-- Modal (rasmni kattalashtirish) -->
-    <div v-if="modalImage" class="fixed inset-0 z-[100] bg-black bg-opacity-80 flex items-center justify-center"
-      @click.self="modalImage = ''">
-      <img :src="modalImage" alt="Zoom Image" class="max-w-full max-h-full rounded shadow-lg" />
-    </div>
-
-    <h2 class="text-lg font-medium intro-y mb-5">{{ $t('proof_of_delivery') }}</h2>
-
-    <!-- Qidiruv va tugmalar -->
-    <div class="flex flex-wrap gap-2 items-center mb-6">
-      <FormInput v-model="searchTerm" type="text" class="!box w-56" :placeholder="$t('search')" />
-      <Button variant="primary" @click="fetchBarcodeInfo">{{ $t('go') }}</Button>
-      <Button variant="secondary" @click="resetSearch">{{ $t('reset') }}</Button>
-      <Button variant="outline-primary" @click="printTable">Print</Button>
-      <Button variant="outline-primary" @click="exportToCSV">CSV</Button>
-      <Button variant="outline-primary" @click="exportToJSON">JSON</Button>
-      <Button variant="outline-primary" @click="exportToXLSX">XLSX</Button>
-      <Button variant="outline-primary" @click="exportToHTML">HTML</Button>
-    </div>
-
-    <!-- Jadval -->
-    <Table class="border-spacing-y-[10px] border-separate -mt-2">
-      <Table.Thead>
-        <Table.Tr>
-          <Table.Th class="whitespace-nowrap"> {{ $t('images') }} </Table.Th>
-          <Table.Th class="whitespace-nowrap"> {{ $t('name_barcode') }} </Table.Th>
-          <Table.Th class="whitespace-nowrap"> {{ $t('address_time') }} </Table.Th>
-        </Table.Tr>
-      </Table.Thead>
-      <Table.Tbody>
-        <Table.Tr v-for="(item, index) in filteredResults" :key="index" class="intro-x">
-          <Table.Td class="box dark:bg-darkmode-600 border-x-0">
-            <div class="flex gap-3">
-              <div class="image-fit zoom-in w-36 h-36">
-                <img :src="item.recipient_signature_url" alt="Imzo" @click="modalImage = item.recipient_signature_url"
-                  class="rounded shadow cursor-pointer hover:opacity-80 transition" />
-              </div>
-              <div class="image-fit zoom-in w-36 h-36">
-                <img :src="item.recipient_card_url" alt="Karta" @click="modalImage = item.recipient_card_url"
-                  class="rounded shadow cursor-pointer hover:opacity-80 transition" />
-              </div>
-            </div>
-          </Table.Td>
-          <Table.Td class="box dark:bg-darkmode-600 border-x-0">
-            <a href="#" class="font-medium whitespace-nowrap">{{ item.name }}</a>
-            <div class="text-slate-500 text-xs mt-0.5">Kod: {{ item.barcode }}</div>
-          </Table.Td>
-          <Table.Td class="box dark:bg-darkmode-600 border-x-0">
-            <div class="whitespace-normal">{{ item.address }}</div>
-            <div class="text-slate-500 text-xs mt-0.5">
-              Holati: {{ new Date(item.last_status_date).toLocaleString() }}
-            </div>
-          </Table.Td>
-        </Table.Tr>
-      </Table.Tbody>
-    </Table>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import axios from "axios";
-import { saveAs } from "file-saver";
-import * as XLSX from "xlsx";
+import "@/assets/css/vendors/tabulator.css";
+import Lucide from "@/components/Base/Lucide";
 import Button from "@/components/Base/Button";
 import { FormInput } from "@/components/Base/Form";
-import Table from "@/components/Base/Table";
-import Loading from "vue3-loading-overlay";
-import "vue3-loading-overlay/dist/vue3-loading-overlay.css";
+import axios from 'axios';
+import { ref, onMounted, reactive, watch } from "vue";
+import { createIcons, icons } from "lucide";
+import { TabulatorFull as Tabulator } from "tabulator-tables";
+import * as xlsx from "xlsx";
+import { useI18n } from 'vue-i18n';
+import { nextTick } from "vue";
 
-const barcode = ref("");
-const searchTerm = ref("");
-const results = ref<any[]>([]);
-const loading = ref(false);
-const modalImage = ref("");
+const { t } = useI18n();
 
-// Ma'lumot olish
-const fetchBarcodeInfo = async () => {
-  loading.value = true;
-  try {
-    const token = localStorage.getItem("token");
+const tableRef = ref<HTMLDivElement>();
+const tabulator = ref<Tabulator>();
+const filter = reactive({ barcode: "" });
+const pageSize = ref(10);
+const showCameraModal = ref(false);
+let currentRowData: any = null;
+let videoStream: MediaStream | null = null;
 
-    if (!token) {
-      alert("Token mavjud emas. Iltimos, qayta login qiling.");
-      window.location.href = "/login";
-      return;
-    }
-
-    const res = await axios.post(
-      "https://treking.uz/barcodes-info/",
-      {
-        barcodes: [barcode.value || searchTerm.value],
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-      }
-    );
-
-    results.value = res.data;
-  } catch (err) {
-    console.error("Xatolik:", err);
-    results.value = [];
-    alert("Ma'lumot olishda xatolik yuz berdi.");
-  } finally {
-    loading.value = false;
-  }
+const errorMessage = ref("");
+const showErrorPopup = ref(false);
+const showPopupError = (message: string) => {
+  errorMessage.value = message;
+  showErrorPopup.value = true;
+  setTimeout(() => showErrorPopup.value = false, 3000);
 };
 
-// Filtrlash
-const filteredResults = computed(() => {
-  if (!searchTerm.value.trim()) return results.value;
-  return results.value.filter((item) =>
-    item.barcode.toLowerCase().includes(searchTerm.value.toLowerCase()) ||
-    item.name.toLowerCase().includes(searchTerm.value.toLowerCase()) ||
-    item.address.toLowerCase().includes(searchTerm.value.toLowerCase())
-  );
+const showCheckedModal = ref(false);
+const checkedInfo = reactive({
+  name: "",
+  time: "",
+  image: ""
 });
 
-// Reset
-const resetSearch = () => {
-  searchTerm.value = "";
-  barcode.value = "";
-  results.value = [];
+const showCheckedInfo = (row: any) => {
+  checkedInfo.name = row.checked_name || "Noma'lum";
+  checkedInfo.time = row.checked_time ? new Date(row.checked_time).toLocaleString() : "Noma'lum";
+
+  if (row.checked_image) {
+    // Agar to‘liq URL bo‘lmasa, boshiga domen qo‘shamiz
+    checkedInfo.image = row.checked_image.startsWith("http")
+      ? row.checked_image
+      : `https://bank1.pochta.uz${row.checked_image}`;
+  } else {
+    checkedInfo.image = "";
+  }
+
+  showCheckedModal.value = true;
 };
 
-// CSV eksport
-const exportToCSV = () => {
-  let csv = "Barcode,Name,Address,Date\n";
-  results.value.forEach((item) => {
-    csv += `"${item.barcode}","${item.name}","${item.address}","${item.last_status_date}"\n`;
-  });
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  saveAs(blob, "barcodes.csv");
+
+const closeCheckedModal = () => {
+  showCheckedModal.value = false;
 };
 
-// JSON eksport
-const exportToJSON = () => {
-  const blob = new Blob([JSON.stringify(results.value, null, 2)], { type: "application/json" });
-  saveAs(blob, "barcodes.json");
+
+const successMessage = ref("");
+const showSuccessPopup = ref(false);
+const showPopupSuccess = (message: string) => {
+  successMessage.value = message;
+  showSuccessPopup.value = true;
+  setTimeout(() => showSuccessPopup.value = false, 3000);
 };
 
-// HTML eksport
-const exportToHTML = () => {
-  let html = "<table border='1'><tr><th>Imzo</th><th>Karta</th><th>Barcode</th><th>Name</th><th>Address</th><th>Date</th></tr>";
-  results.value.forEach((item) => {
-    html += `
-      <tr>
-        <td><img src="${item.recipient_signature_url}" width="100" /></td>
-        <td><img src="${item.recipient_card_url}" width="100" /></td>
-        <td>${item.barcode}</td>
-        <td>${item.name}</td>
-        <td>${item.address}</td>
-        <td>${item.last_status_date}</td>
-      </tr>`;
-  });
-  html += "</table>";
-  const blob = new Blob([html], { type: "text/html" });
-  saveAs(blob, "barcodes.html");
+const takingPhoto = ref(false);
+
+const openCameraModal = async (rowData: any) => {
+  currentRowData = rowData;
+  showCameraModal.value = true;
+  await nextTick();
+  try {
+    const video = document.getElementById("cameraPreview") as HTMLVideoElement;
+    videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = videoStream;
+  } catch (err) {
+    showPopupError("Kamera ochilmadi: " + (err as Error).message);
+    console.error("Kamera xatosi:", err);
+  }
 };
 
-// Chop etish
-const printTable = () => {
-  const win = window.open("", "", "width=900,height=700");
-  win?.document.write("<html><head><title>Print</title></head><body>");
-  win?.document.write("<h3>Barcode Ma'lumotlari</h3><table border='1' cellpadding='10'><tr><th>Imzo</th><th>Karta</th><th>Barcode</th><th>Name</th><th>Address</th><th>Date</th></tr>");
-  results.value.forEach((item) => {
-    win?.document.write(`
-      <tr>
-        <td><img src="${item.recipient_signature_url}" width="100"/></td>
-        <td><img src="${item.recipient_card_url}" width="100"/></td>
-        <td>${item.barcode}</td>
-        <td>${item.name}</td>
-        <td>${item.address}</td>
-        <td>${item.last_status_date}</td>
-      </tr>`);
-  });
-  win?.document.write("</table></body></html>");
-  win?.document.close();
-  win?.print();
+const closeCameraModal = () => {
+  const video = document.getElementById("cameraPreview") as HTMLVideoElement;
+  if (videoStream) videoStream.getTracks().forEach(track => track.stop());
+  video.srcObject = null;
+  showCameraModal.value = false;
+  currentRowData = null;
+  takingPhoto.value = false;
 };
 
-// XLSX eksport
-const exportToXLSX = () => {
-  const simplifiedData = results.value.map((item) => ({
-    Imzo: item.recipient_signature_url,
-    Karta: item.recipient_card_url,
-    Barcode: item.barcode,
-    Name: item.name,
-    Address: item.address,
-    Date: item.last_status_date,
-  }));
+const takePhoto = async () => {
+  if (takingPhoto.value) return;
+  takingPhoto.value = true;
 
-  const worksheet = XLSX.utils.json_to_sheet(simplifiedData);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Barcodes");
-  const xlsxBlob = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-  const blob = new Blob([xlsxBlob], { type: "application/octet-stream" });
-  saveAs(blob, "barcodes.xlsx");
+  const video = document.getElementById("cameraPreview") as HTMLVideoElement;
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext("2d");
+  ctx?.drawImage(video, 0, 0);
+
+  const base64Image = canvas.toDataURL("image/jpeg");
+  const token = localStorage.getItem("token");
+  if (!token) {
+    showPopupError("Token topilmadi.");
+    takingPhoto.value = false;
+    return;
+  }
+
+  try {
+    const response = await axios.post("https://bank1.pochta.uz/api/v1/face-recognition/", {
+      photo: base64Image,
+    }, {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.data?.token && response.data?.phone_number) {
+      const { phone_number } = response.data;
+
+      await axios.post("https://bank1.pochta.uz/api/v1/check-mail/", {
+        id: currentRowData.id,
+        phone_number,
+        barcode: currentRowData.barcode,
+        checked_image: base64Image
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      showPopupSuccess("Jo'natma tasdiqlandi!");
+      tabulator.value?.setPage(1);
+    } else {
+      showPopupError("Jo'natma tasdiqlanmadi. Yuz aniqlanmadi.");
+    }
+  } catch (err: any) {
+    console.error(err);
+
+    if (err.response?.status === 400) {
+      showPopupError("Jo'natma tasdiqlanmadi. Rasm noto‘g‘ri yoki aniqlanmadi.");
+    } else {
+      showPopupError("Xatolik yuz berdi!");
+    }
+  } finally {
+    closeCameraModal();
+  }
+
 };
+
+const initTabulator = async () => {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    showPopupError("Token topilmadi. Iltimos, tizimga kiring.");
+    return;
+  }
+
+  if (tableRef.value) {
+    tabulator.value = new Tabulator(tableRef.value, {
+      ajaxURL: "https://bank1.pochta.uz/api/v1/mails-all/",
+      ajaxConfig: {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+      ajaxResponse: (_, __, response) => {
+        const phoneNumber = localStorage.getItem("phone");
+        console.log(phoneNumber)
+        let dataToShow: any[] = [];
+
+        // API response tarkibi `results` ichida bo'lishi mumkin yoki bevosita massiv
+        if (Array.isArray(response)) {
+          dataToShow = response;
+        } else if (Array.isArray(response.results)) {
+          dataToShow = response.results;
+        }
+
+        // Faqat 123 uchun barcha, boshqalar uchun faqat is_check: false
+        if (phoneNumber !== "123") {
+          dataToShow = dataToShow.filter((item) => item.is_check === false);
+        }
+
+        return {
+          data: dataToShow.map((item: any) => ({
+            id: item.id,
+            barcode: item.barcode,
+            weight: item.weight,
+            sent_date: item.send_date ? new Date(item.send_date).toLocaleDateString() : '-',
+            received_date: item.received_date ? new Date(item.received_date).toLocaleDateString() : '-',
+            last_event_date: item.last_event_date ? new Date(item.last_event_date).toLocaleDateString() : '-',
+            city: item.city || '-',
+            is_check: item.is_check,
+            checked_name: item.checked_name,
+            checked_time: item.checked_time,
+            checked_image: item.checked_image,
+          })),
+          last_page: Math.ceil(dataToShow.length / pageSize.value),
+        };
+      },
+      layout: "fitColumns",
+      pagination: true,
+      paginationSize: pageSize.value,
+      paginationMode: "remote",
+      placeholder: "No matching records found",
+      columns: (() => {
+        const phone = localStorage.getItem("phone");
+
+        const commonColumns = [
+          { title: t("barcode"), field: "barcode", hozAlign: "center" },
+          { title: t("weight"), field: "weight", hozAlign: "center" },
+          { title: t("sent_date"), field: "sent_date", hozAlign: "center" },
+          { title: t("received_date"), field: "received_date", hozAlign: "center" },
+          { title: t("last_event_date"), field: "last_event_date", hozAlign: "center" },
+          { title: t("city"), field: "city", hozAlign: "center" },
+        ];
+
+        if (phone === "123") {
+          return [
+            ...commonColumns,
+            {
+              title: "Holati",
+              field: "is_check",
+              hozAlign: "center",
+              formatter: (cell: any) => {
+                const row = cell.getData();
+                if (row.is_check) {
+                  return `<button class='checked-info-btn bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-4 rounded-full text-xs'>Tasdiqlangan</button>`;
+                } else {
+                  return "<span class='text-red-600 font-semibold'>Tasdiqlanmagan</span>";
+                }
+              },
+              cellClick: (e, cell) => {
+                const rowData = cell.getData() as any;
+                if (rowData.is_check) {
+                  showCheckedInfo(rowData);
+                  console.log(rowData)
+                }
+              }
+            },
+          ];
+        } else {
+          return [
+            ...commonColumns,
+            {
+              title: t("approve"),
+              formatter: () =>
+                `<button class='approve-btn bg-blue-800 hover:bg-blue-700 text-white font-bold py-1 px-4 rounded-full text-xs'>${t("approve")}</button>`,
+              width: 130,
+              hozAlign: "center",
+              cellClick: async function (e, cell) {
+                const rowData = cell.getData();
+                await openCameraModal(rowData);
+              },
+            },
+          ];
+        }
+      })(),
+      ajaxURLGenerator: (url, config, params) => {
+        const searchParams = new URLSearchParams();
+        searchParams.set("page", params.page);
+        searchParams.set("page_size", pageSize.value.toString());
+        if (filter.barcode) searchParams.set("barcode", filter.barcode);
+        return `${url}?${searchParams.toString()}`;
+      },
+    });
+
+    tabulator.value.on("renderComplete", () => {
+      createIcons({ icons, attrs: { "stroke-width": 1.5 }, nameAttr: "data-lucide" });
+    });
+  }
+};
+
+const onFilter = () => tabulator.value?.setPage(1);
+const onResetFilter = () => { filter.barcode = ""; tabulator.value?.setPage(1); };
+const changePageSize = () => tabulator.value?.setPageSize(pageSize.value);
+onMounted(() => { initTabulator(); window.addEventListener("resize", () => tabulator.value?.redraw()); });
+watch(pageSize, () => changePageSize());
+
+const onExportCsv = () => tabulator.value?.download("csv", "data.csv");
+const onExportJson = () => tabulator.value?.download("json", "data.json");
+const onExportXlsx = () => { (window as any).XLSX = xlsx; tabulator.value?.download("xlsx", "data.xlsx", { sheetName: "Data" }); };
+const onExportHtml = () => tabulator.value?.download("html", "data.html", { style: true });
+const onPrint = () => tabulator.value?.print();
 </script>
 
-<style scoped>
-.shadow {
-  box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.2);
-}
 
-.dots span {
-  display: inline-block;
-  animation: bounce 1s infinite;
-}
+<template>
+  <div class="intro-y box p-5 mt-5">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-medium">{{ $t('statuses_statistics') }}</h2>
+    </div>
 
-.dots span:nth-child(1) {
-  animation-delay: 0s;
-}
+    <div class="mt-5 flex gap-2 flex-wrap items-center">
+      <FormInput v-model="filter.barcode" style="width: 250px;" :placeholder="$t('search_barcode')" />
+      <Button @click="onFilter">{{ $t('go') }}</Button>
+      <Button variant="secondary" @click="onResetFilter">{{ $t('reset') }}</Button>
+      <Button variant="outline-secondary" @click="onPrint">
+        <Lucide icon="Printer" class="w-4 h-4 mr-2" /> Print
+      </Button>
+      <Button variant="outline-secondary" @click="onExportCsv">CSV</Button>
+      <Button variant="outline-secondary" @click="onExportJson">JSON</Button>
+      <Button variant="outline-secondary" @click="onExportXlsx">XLSX</Button>
+      <Button variant="outline-secondary" @click="onExportHtml">HTML</Button>
 
-.dots span:nth-child(2) {
-  animation-delay: 0.2s;
-}
+      <select v-model="pageSize" class="form-select ml-auto w-20">
+        <option v-for="size in [10, 20, 50, 100]" :key="size" :value="size">{{ size }}</option>
+      </select>
+    </div>
 
-.dots span:nth-child(3) {
-  animation-delay: 0.4s;
-}
+    <div class="overflow-x-auto scrollbar-hidden mt-5">
+      <div ref="tableRef"></div>
+    </div>
+  </div>
 
-@keyframes bounce {
+  <div v-if="showCameraModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white p-4 rounded shadow-lg relative">
+      <video id="cameraPreview" autoplay playsinline class="mb-4 w-80 h-60 bg-gray-200 rounded"></video>
 
-  0%,
-  80%,
-  100% {
-    transform: translateY(0);
-  }
+      <div class="flex justify-between">
+        <button @click="takePhoto" :disabled="takingPhoto" style="color: #ffff;"
+          class="bg-green-600 text-white px-4 py-2 rounded mr-2">
+          Rasmga olish
+        </button>
 
-  40% {
-    transform: translateY(-8px);
-  }
-}
-</style>
+        <button @click="closeCameraModal" class="bg-gray-400 text-white px-4 py-2 rounded">Bekor qilish</button>
+      </div>
+    </div>
+  </div>
+  <!-- Error Popup -->
+  <!-- Success Popup -->
+  <div v-if="showSuccessPopup"
+    class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-green-600 text-white px-6 py-3 rounded shadow-lg z-[100]">
+    {{ successMessage }}
+  </div>
+  <!-- Error Popup -->
+  <div v-if="showErrorPopup"
+    class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white px-6 py-3 rounded shadow-lg z-[100]">
+    {{ errorMessage }}
+  </div>
+  <div v-if="showCheckedModal" class="fixed inset-0 z-[100] bg-black bg-opacity-60 flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-[90%] max-w-md relative">
+      <button @click="closeCheckedModal"
+        class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-xl">&times;</button>
+      <h3 class="text-lg font-semibold text-green-700 mb-4">Tasdiqlovchi Ma'lumotlar</h3>
+      <p><strong>F.I.Sh:</strong> {{ checkedInfo.name }}</p>
+      <p><strong>Vaqti:</strong> {{ checkedInfo.time }}</p>
+      <div v-if="checkedInfo.image" class="mt-4">
+        <img :src="checkedInfo.image" alt="Tasdiqlangan rasm"
+          class="rounded shadow border w-full object-cover max-h-60" />
+      </div>
+      <div v-else class="mt-4 text-gray-500 italic">Rasm mavjud emas</div>
+    </div>
+  </div>
+
+</template>

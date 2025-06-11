@@ -160,7 +160,7 @@ const fetchStatsData = async () => {
   }
 
   try {
-    const response = await fetch("https://ftp.treking.uz/api/v1/dashboard-status/", {
+    const response = await fetch("https://bank1.pochta.uz/api/v1/dashboard-status/", {
       headers: {
         Authorization: "Bearer " + token,
       },
