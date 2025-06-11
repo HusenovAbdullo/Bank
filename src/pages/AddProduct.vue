@@ -69,6 +69,7 @@ const showPopupSuccess = (message: string) => {
 const takingPhoto = ref(false);
 
 const openCameraModal = async (rowData: any) => {
+  
   currentRowData = rowData;
   showCameraModal.value = true;
   await nextTick();
@@ -143,7 +144,7 @@ const takePhoto = async () => {
     if (err.response?.status === 400) {
       showPopupError("Jo'natma tasdiqlanmadi. Rasm noto‘g‘ri yoki aniqlanmadi.");
     } else {
-      showPopupError("Xatolik yuz berdi!");
+      showPopupError("Xatolik yuz berdi! Bu jo'natma sizga tegishli emas");
     }
   } finally {
     closeCameraModal();
@@ -273,6 +274,23 @@ const initTabulator = async () => {
   }
 };
 
+const isMobile = ref(false);
+
+onMounted(() => {
+  isMobile.value = window.innerWidth < 800;
+  window.addEventListener("resize", () => {
+    isMobile.value = window.innerWidth < 800;
+    if (!isMobile.value && !tabulator.value) {
+      initTabulator();
+    }
+  });
+
+  if (!isMobile.value) {
+    initTabulator();
+  }
+});
+
+
 const onFilter = () => tabulator.value?.setPage(1);
 const onResetFilter = () => { filter.barcode = ""; tabulator.value?.setPage(1); };
 const changePageSize = () => tabulator.value?.setPageSize(pageSize.value);
@@ -288,58 +306,66 @@ const onPrint = () => tabulator.value?.print();
 
 
 <template>
-  <div class="intro-y box p-5 mt-5">
-    <div class="flex items-center justify-between">
-      <h2 class="text-lg font-medium">{{ $t('statuses_statistics') }}</h2>
-    </div>
+  <div v-if="!isMobile">
+    <div class="intro-y box p-5 mt-5">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-medium">{{ $t('statuses_statistics') }}</h2>
+      </div>
 
-    <div class="mt-5 flex gap-2 flex-wrap items-center">
-      <FormInput v-model="filter.barcode" style="width: 250px;" :placeholder="$t('search_barcode')" />
-      <Button @click="onFilter">{{ $t('go') }}</Button>
-      <Button variant="secondary" @click="onResetFilter">{{ $t('reset') }}</Button>
-      <Button variant="outline-secondary" @click="onPrint">
-        <Lucide icon="Printer" class="w-4 h-4 mr-2" /> Print
-      </Button>
-      <Button variant="outline-secondary" @click="onExportCsv">CSV</Button>
-      <Button variant="outline-secondary" @click="onExportJson">JSON</Button>
-      <Button variant="outline-secondary" @click="onExportXlsx">XLSX</Button>
-      <Button variant="outline-secondary" @click="onExportHtml">HTML</Button>
+      <div class="mt-5 flex gap-2 flex-wrap items-center">
+        <FormInput v-model="filter.barcode" style="width: 250px;" :placeholder="$t('search_barcode')" />
+        <Button @click="onFilter">{{ $t('go') }}</Button>
+        <Button variant="secondary" @click="onResetFilter">{{ $t('reset') }}</Button>
+        <Button variant="outline-secondary" @click="onPrint">
+          <Lucide icon="Printer" class="w-4 h-4 mr-2" /> Print
+        </Button>
+        <Button variant="outline-secondary" @click="onExportCsv">CSV</Button>
+        <Button variant="outline-secondary" @click="onExportJson">JSON</Button>
+        <Button variant="outline-secondary" @click="onExportXlsx">XLSX</Button>
+        <Button variant="outline-secondary" @click="onExportHtml">HTML</Button>
 
-      <select v-model="pageSize" class="form-select ml-auto w-20">
-        <option v-for="size in [10, 20, 50, 100]" :key="size" :value="size">{{ size }}</option>
-      </select>
-    </div>
+        <select v-model="pageSize" class="form-select ml-auto w-20">
+          <option v-for="size in [10, 20, 50, 100]" :key="size" :value="size">{{ size }}</option>
+        </select>
+      </div>
 
-    <div class="overflow-x-auto scrollbar-hidden mt-5">
-      <div ref="tableRef"></div>
+      <div class="overflow-x-auto scrollbar-hidden mt-5">
+        <div ref="tableRef"></div>
+      </div>
     </div>
   </div>
 
+  <!-- Agar mobil bo‘lsa, ogohlantirish matni chiqadi -->
+  <div v-else class="text-center mt-20 text-red-600 font-semibold text-lg">
+    Jadval faqat katta ekranlarda mavjud. Iltimos, kompyuterdan foydalaning.
+  </div>
+
+  <!-- Kamera Modal -->
   <div v-if="showCameraModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
     <div class="bg-white p-4 rounded shadow-lg relative">
       <video id="cameraPreview" autoplay playsinline class="mb-4 w-80 h-60 bg-gray-200 rounded"></video>
-
       <div class="flex justify-between">
-        <button @click="takePhoto" :disabled="takingPhoto" style="color: #ffff;"
-          class="bg-green-600 text-white px-4 py-2 rounded mr-2">
+        <button @click="takePhoto" :disabled="takingPhoto" class="bg-green-600 text-white px-4 py-2 rounded mr-2">
           Rasmga olish
         </button>
-
         <button @click="closeCameraModal" class="bg-gray-400 text-white px-4 py-2 rounded">Bekor qilish</button>
       </div>
     </div>
   </div>
-  <!-- Error Popup -->
+
   <!-- Success Popup -->
   <div v-if="showSuccessPopup"
     class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-green-600 text-white px-6 py-3 rounded shadow-lg z-[100]">
     {{ successMessage }}
   </div>
+
   <!-- Error Popup -->
   <div v-if="showErrorPopup"
     class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white px-6 py-3 rounded shadow-lg z-[100]">
     {{ errorMessage }}
   </div>
+
+  <!-- Checked Info Modal -->
   <div v-if="showCheckedModal" class="fixed inset-0 z-[100] bg-black bg-opacity-60 flex items-center justify-center">
     <div class="bg-white rounded-lg shadow-xl p-6 w-[90%] max-w-md relative">
       <button @click="closeCheckedModal"
@@ -354,5 +380,4 @@ const onPrint = () => tabulator.value?.print();
       <div v-else class="mt-4 text-gray-500 italic">Rasm mavjud emas</div>
     </div>
   </div>
-
 </template>
